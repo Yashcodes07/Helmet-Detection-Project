@@ -1,111 +1,116 @@
-# Helmet Detection App
+#  Helmet Detection System
 
-Full-stack app using your YOLOv8 model to detect helmets (and persons / motorcycles) in images and videos.
+A real-time helmet detection web app powered by a custom-trained **YOLOv8** model. Upload an image or video and the system draws bounding boxes around detected helmets, persons, and motorcycles — instantly telling you whether a helmet is present or not.
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.4-3178C6?logo=typescript&logoColor=white)
+![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-FF6F00)
+
+---
+
+## Demo
+
+| Helmet Detected ✅ | No Helmet ❌ |
+|---|---|
+| Green bounding box drawn around helmet | Red alert — no helmet found in frame |
+
+---
+
+## ✨ Features
+
+- 🖼️ **Image detection** — upload JPG, PNG, or WEBP and get an annotated result instantly
+- 🎥 **Video detection** — upload MP4/MOV and every frame is processed; annotated video returned
+- 🟢 **Clear verdict** — "Helmet detected" or "No helmet detected" shown prominently
+- 📦 **Bounding boxes** — color-coded per class (helmet, person, motorcycle)
+- 📊 **Detection table** — confidence scores and box coordinates for every detection
+- ⬇️ **Download result** — save the annotated image or video directly from the UI
+
+---
+
+## 🧠 Model
+
+- Architecture: **YOLOv8n** (nano — fast inference)
+- Dataset: **Open Images V7** (via FiftyOne)
+- Classes: `helmet` · `person` · `motorcycle`
+- Training: 35 epochs · 640px · batch 32 · Google Colab GPU
+- Weights file: `best.pt` *(not included in repo — see setup below)*
+
+---
+
+## 🗂️ Project Structure
 
 ```
 helmet-detection/
 ├── backend/
-│   ├── main.py              ← FastAPI app
-│   ├── requirements.txt
-│   ├── weights/
-│   │   └── best.pt          ← ⚠️ place your weights here
-│   └── outputs/             ← auto-created; annotated results saved here
+│   ├── main.py              # FastAPI app — detection endpoints
+│   ├── requirements.txt     # Python dependencies
+│   └── weights/
+│       └── best.pt          # ← place your model weights here
 └── frontend/
     ├── src/
     │   ├── App.tsx
-    │   ├── components/
-    │   ├── hooks/
-    │   └── utils/
+    │   ├── components/      # DropZone, ResultPanel, DetectionTable …
+    │   ├── hooks/           # useDetection
+    │   └── utils/           # API calls, TypeScript types
     ├── package.json
     └── vite.config.ts
 ```
 
 ---
 
-## 1 — Add your model weights
+## 🚀 Getting Started
 
-Copy your trained `best.pt` into:
+### Prerequisites
 
-```
-backend/weights/best.pt
-```
-
----
-
-## 2 — Start the backend
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-API will be live at **http://localhost:8000**  
-Interactive docs: **http://localhost:8000/docs**
+- Python 3.10+
+- Node.js 18+
+- Your trained `best.pt` weights file
 
 ---
 
-## 3 — Start the frontend
+## 🔌 API Endpoints
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check + loaded classes |
+| `POST` | `/detect/image` | Upload image → annotated image + detections |
+| `POST` | `/detect/video` | Upload video → annotated video + frame stats |
 
-Open **http://localhost:5173**
 
----
 
-## API reference
+## 🛠️ Tech Stack
 
-### `POST /detect/image`
-
-Upload an image (JPG / PNG / WEBP). Returns:
-
-```json
-{
-  "helmet_detected": true,
-  "message": "Helmet detected",
-  "output_url": "/outputs/<filename>.jpg",
-  "detections": [
-    { "label": "helmet", "confidence": 0.87, "box": [x1, y1, x2, y2] }
-  ]
-}
-```
-
-### `POST /detect/video`
-
-Upload a video (MP4 / WEBM / MOV). Returns:
-
-```json
-{
-  "helmet_detected": true,
-  "helmet_frames": 42,
-  "total_detections": 150,
-  "message": "Helmet detected in 42 frames",
-  "output_url": "/outputs/<filename>.mp4",
-  "detections": [ ... ]
-}
-```
+| Layer | Technology |
+|-------|-----------|
+| Model | YOLOv8n (Ultralytics) |
+| Backend | FastAPI + Uvicorn |
+| Image processing | OpenCV |
+| Frontend | React 18 + TypeScript |
+| Bundler | Vite |
+| Icons | Lucide React |
 
 ---
 
-## Production deployment
+## 📓 Training Notebook
 
-**Backend** — swap `uvicorn main:app` with gunicorn:
+The model was trained in Google Colab using:
 
-```bash
-pip install gunicorn
-gunicorn main:app -w 2 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
-```
+- **FiftyOne** to download and prepare Open Images V7
+- **YOLOv8n** fine-tuned for 35 epochs on helmet/person/motorcycle classes
+- Export to YOLO format → trained with `ultralytics` trainer
 
-**Frontend** — build and serve static files:
+See `notebook/final.ipynb` for the full training pipeline.
 
-```bash
-npm run build          # outputs to frontend/dist/
-```
+---
 
-Point your reverse proxy (nginx / caddy) to serve `dist/` and proxy `/detect`, `/outputs`, `/health` to port 8000.
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, open an issue first to discuss what you'd like to change.
+
+---
+
+## 📄 License
+
+MIT License — feel free to use, modify, and distribute.
