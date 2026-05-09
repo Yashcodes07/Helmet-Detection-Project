@@ -1,0 +1,54 @@
+# ── Python virtual environments ───────────────────────────────────────────────
+myvenv/
+venv/
+.venv/
+env/
+ENV/
+
+# ── Python cache ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Model weights (large files — share separately) ────────────────────────────
+backend/weights/*.pt
+backend/weights/*.pth
+backend/weights/*.onnx
+
+# ── Detection outputs (generated files) ───────────────────────────────────────
+backend/outputs/
+
+# ── YOLO training runs ────────────────────────────────────────────────────────
+runs/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+
+# ── Vite ──────────────────────────────────────────────────────────────────────
+*.local
+frontend/.vite/
+
+# ── Environment variables ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
