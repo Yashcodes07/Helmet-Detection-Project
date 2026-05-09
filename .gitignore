@@ -13,7 +13,7 @@ __pycache__/
 .Python
 
 # ── Model weights (large files — share separately) ────────────────────────────
-backend/weights/*.pt
+
 backend/weights/*.pth
 backend/weights/*.onnx
 
