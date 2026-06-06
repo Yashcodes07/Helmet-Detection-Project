@@ -1,6 +1,6 @@
 import type { ImageResult, VideoResult } from "./types";
 
-const BASE = "";   // proxied by Vite dev server; in prod set VITE_API_URL
+const BASE = "https://helmet-detection-api-dfwl.onrender.com";   // proxied by Vite dev server; in prod set VITE_API_URL
 
 export async function detectImage(file: File): Promise<ImageResult> {
   const fd = new FormData();
