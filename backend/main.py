@@ -1,17 +1,24 @@
 import os
+import gc
 import cv2
 import uuid
+import base64
 import shutil
 import tempfile
 import numpy as np
+import torch
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from ultralytics import YOLO
+
+# ── memory optimizations ───────────────────────────────────────────────────────
+torch.set_num_threads(1)
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 app = FastAPI(title="Helmet Detection API", version="1.0.0")
 
@@ -26,10 +33,6 @@ app.add_middleware(
 # ── paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
 MODEL_PATH = BASE_DIR / "weights" / "best.pt"
-OUTPUT_DIR = BASE_DIR / "outputs"
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-app.mount("/outputs", StaticFiles(directory=str(OUTPUT_DIR)), name="outputs")
 
 # ── load model once ────────────────────────────────────────────────────────────
 if not MODEL_PATH.exists():
@@ -39,7 +42,8 @@ if not MODEL_PATH.exists():
     )
 
 model = YOLO(str(MODEL_PATH))
-CLASS_NAMES = model.names          # {0: 'helmet', 1: 'motorcycle', 2: 'person'} (order may vary)
+model.overrides['verbose'] = False
+CLASS_NAMES = model.names
 CONF_THRESHOLD = 0.35
 
 # colour palette: helmet=green  person=blue  motorcycle=orange  default=red
@@ -55,7 +59,7 @@ def _color(label: str):
 
 
 def draw_boxes(frame: np.ndarray, results) -> tuple[np.ndarray, list[dict]]:
-    """Draw bounding boxes on *frame* and return annotated frame + detection list."""
+    """Draw bounding boxes on frame and return annotated frame + detection list."""
     detections = []
     annotated = frame.copy()
 
@@ -90,10 +94,14 @@ def process_image(src_path: str) -> tuple[str, list[dict]]:
         raise ValueError("Cannot read image file")
     results = model(frame, conf=CONF_THRESHOLD)
     annotated, detections = draw_boxes(frame, results)
-    out_name = f"{uuid.uuid4().hex}.jpg"
-    out_path = OUTPUT_DIR / out_name
-    cv2.imwrite(str(out_path), annotated)
-    return out_name, detections
+
+    # encode directly to base64 — no disk write needed
+    _, buffer = cv2.imencode(".jpg", annotated)
+    b64 = base64.b64encode(buffer).decode("utf-8")
+
+    del results, frame, annotated, buffer
+    gc.collect()
+    return b64, detections
 
 
 def process_video(src_path: str) -> tuple[str, list[dict]]:
@@ -105,9 +113,12 @@ def process_video(src_path: str) -> tuple[str, list[dict]]:
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
 
-    out_name = f"{uuid.uuid4().hex}.mp4"
-    out_path = OUTPUT_DIR / out_name
-    writer = cv2.VideoWriter(str(out_path),
+    # write to temp file
+    tmp_out = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    tmp_out_path = tmp_out.name
+    tmp_out.close()
+
+    writer = cv2.VideoWriter(tmp_out_path,
                              cv2.VideoWriter_fourcc(*"mp4v"),
                              fps, (w, h))
 
@@ -125,10 +136,20 @@ def process_video(src_path: str) -> tuple[str, list[dict]]:
             d["frame"] = frame_idx
             all_detections.append(d)
         frame_idx += 1
+        del results, frame, annotated
+        if frame_idx % 10 == 0:
+            gc.collect()
 
     cap.release()
     writer.release()
-    return out_name, all_detections
+
+    # encode video to base64
+    with open(tmp_out_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+
+    os.unlink(tmp_out_path)
+    gc.collect()
+    return b64, all_detections
 
 
 # ── routes ─────────────────────────────────────────────────────────────────────
@@ -149,7 +170,7 @@ async def detect_image(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        out_name, detections = process_image(tmp_path)
+        b64, detections = process_image(tmp_path)
     except Exception as e:
         raise HTTPException(500, str(e))
     finally:
@@ -159,7 +180,7 @@ async def detect_image(file: UploadFile = File(...)):
     return {
         "helmet_detected": helmet_detected,
         "detections": detections,
-        "output_url": f"/outputs/{out_name}",
+        "output_image": f"data:image/jpeg;base64,{b64}",
         "message": "Helmet detected" if helmet_detected else "No helmet detected",
     }
 
@@ -175,7 +196,7 @@ async def detect_video(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        out_name, detections = process_video(tmp_path)
+        b64, detections = process_video(tmp_path)
     except Exception as e:
         raise HTTPException(500, str(e))
     finally:
@@ -186,8 +207,8 @@ async def detect_video(file: UploadFile = File(...)):
         "helmet_detected": helmet_frames > 0,
         "helmet_frames": helmet_frames,
         "total_detections": len(detections),
-        "detections": detections[:500],          # cap payload size
-        "output_url": f"/outputs/{out_name}",
+        "detections": detections[:500],
+        "output_image": f"data:video/mp4;base64,{b64}",
         "message": (f"Helmet detected in {helmet_frames} frames"
                     if helmet_frames else "No helmet detected in any frame"),
     }

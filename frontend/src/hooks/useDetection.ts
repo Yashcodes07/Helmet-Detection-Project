@@ -19,7 +19,7 @@ export function useDetection() {
       setState({
         status: "success",
         result,
-        outputUrl: result.output_url,
+        outputUrl: result.output_image,  // ← only change
       });
     } catch (e) {
       setState({ status: "error", message: (e as Error).message });
@@ -27,6 +27,5 @@ export function useDetection() {
   }, []);
 
   const reset = useCallback(() => setState({ status: "idle" }), []);
-
   return { state, run, reset };
 }
