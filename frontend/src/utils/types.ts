@@ -8,7 +8,7 @@ export interface Detection {
 export interface ImageResult {
   helmet_detected: boolean;
   detections: Detection[];
-  output_url: string;
+  output_image: string;   // changed from output_url
   message: string;
 }
 
@@ -17,7 +17,7 @@ export interface VideoResult {
   helmet_frames: number;
   total_detections: number;
   detections: Detection[];
-  output_url: string;
+  output_image: string;   // changed from output_url
   message: string;
 }
 
